@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How a CNN reads an image</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e9ecf1;--ink:#10131c;--mu:#566075;--bl:#2438ff;--rd:#d6247b;--ye:#ffe14d;--ln:#10131c30;color-scheme:light dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1018;--ink:#e9ecf4;--mu:#9aa3bb;--bl:#8d9aff;--rd:#ff6fb0;--ln:#e9ecf433}}
+:root[data-theme="dark"]{--bg:#0e1018;--ink:#e9ecf4;--mu:#9aa3bb;--bl:#8d9aff;--rd:#ff6fb0;--ln:#e9ecf433}
+*,*:before,*:after{box-sizing:inherit}
+html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.7 'Source Serif 4',Georgia,serif;overflow-x:hidden}
+h1,h2,h3,.btn,select,nav,.ol button{font-family:'Bricolage Grotesque','Helvetica Neue',Arial,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:0 22px 60px}
+a{color:inherit}
+nav{display:flex;flex-wrap:wrap;gap:6px 26px;padding:22px 0;font-size:15px;font-weight:500}
+nav a{text-underline-offset:5px;text-decoration-thickness:1px}
+nav a:hover{color:var(--bl);text-decoration-thickness:2px}
+.hero{padding:44px 0 64px;max-width:760px}
+h1{font-size:clamp(40px,6.6vw,76px);line-height:.98;font-weight:800;letter-spacing:-.035em;margin:0 0 22px}
+.hero p{margin:0 0 14px;max-width:620px}
+canvas{display:block;width:100%;height:auto}
+section{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:44px;border-top:2px solid var(--ink);padding:34px 0 70px}
+h2{font-size:clamp(28px,3.6vw,40px);line-height:1.05;font-weight:800;letter-spacing:-.025em;margin:0 0 16px}
+section p{margin:0 0 14px}
+.mu{color:var(--mu);font-size:16px}
+@media(max-width:840px){section{grid-template-columns:1fr;gap:26px}}
+.row{display:flex;flex-wrap:wrap;gap:22px 28px;align-items:flex-start}
+.col{flex:0 0 auto;max-width:100%}
+.col small{display:block;font:500 13px 'Bricolage Grotesque',sans-serif;color:var(--mu);margin-bottom:7px}
+.grid{display:grid;gap:2px;width:min(210px,calc(100vw - 44px))}
+.grid.k{width:96px}
+.grid i{font:500 13px 'JetBrains Mono',ui-monospace,monospace;font-style:normal;aspect-ratio:1;display:grid;place-items:center;border:1px solid var(--ln);transition:background .25s}
+.grid i.p{background:repeating-linear-gradient(135deg,transparent 0 4px,var(--ln) 4px 5px);color:var(--mu)}
+.grid i.h{background:var(--ye);color:#10131c;border-color:var(--ink)}
+.grid i.o.f{color:var(--bl);font-weight:700;border-color:var(--bl)}
+.k i{border-color:var(--rd);color:var(--rd);font-weight:700}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-top:20px}
+.btn{font-size:15px;font-weight:700;background:var(--ink);color:var(--bg);border:0;border-radius:3px;padding:9px 20px;cursor:pointer}
+.btn:hover{background:var(--bl);color:#fff}
+.btn.t{background:none;color:var(--ink);padding:9px 2px;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:1px}
+.btn.t:hover{color:var(--bl);background:none}.btn.t.on{text-decoration-thickness:3px;text-decoration-color:var(--bl)}
+:focus-visible{outline:3px solid var(--bl);outline-offset:3px}
+label{font-size:15px}
+select{background:transparent;color:var(--ink);border:0;border-bottom:2px solid var(--ink);padding:3px 2px;font-size:15px;font-weight:500;border-radius:0}
+select option{background:var(--bg);color:var(--ink)}
+.calc{margin-top:18px;font:500 13.5px/1.6 'JetBrains Mono',ui-monospace,monospace;min-height:44px;word-break:break-word}
+.read{font:500 14px/1.9 'JetBrains Mono',ui-monospace,monospace;margin-top:14px}
+.read b{color:var(--bl);font-weight:700}.read b.m{color:var(--rd)}
+input[type=range]{width:100%;accent-color:var(--bl);margin:4px 0 12px}
+.ol{list-style:none;margin:0;padding:0;border-top:1px solid var(--ln)}
+.ol li{border-bottom:1px solid var(--ln)}
+.ol button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:16px;width:100%;padding:13px 0;font:700 18px 'Bricolage Grotesque',sans-serif}
+.ol button:focus-visible{outline:3px solid var(--bl)}
+.ol button span{font:500 14px 'JetBrains Mono',monospace;color:var(--mu);width:22px;padding-top:3px}
+.ol li.on button{color:var(--bl)}.ol li.on button span{color:var(--bl)}
+.ol .d{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s}
+.ol li.on .d{grid-template-rows:1fr}
+.ol .d div{overflow:hidden;padding-left:38px}
+.ol .d p{margin:0 0 16px;max-width:540px}
+footer{border-top:2px solid var(--ink);padding-top:20px;color:var(--mu);font-size:15px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style></head><body><main>
+<nav aria-label="Sections"><a href="#conv">Convolution and padding</a><a href="#pool">Pooling</a><a href="#act">ReLU and sigmoid</a><a href="#neuron">One neuron</a><a href="#net">Dense layers and propagation</a><a href="#flow">The whole pipeline</a></nav>
+
+<header class="hero">
+<div><h1>How a CNN reads an image</h1>
+<p>A convolutional network never looks at a picture the way you do. It slides small filters over a grid of numbers and keeps track of where something interesting shows up.</p>
+<p>This page walks through each piece in order. Everything that moves is a real calculation, so pause it, change a setting, and check the arithmetic yourself.</p></div>
+</header>
+
+<section id="conv"><div><h2>Convolution and padding</h2>
+<p>A filter is a small grid of weights. Place it on the image, multiply each weight by the pixel under it, add everything up, and you get one number. Slide it one step and repeat. The numbers you collect make a feature map.</p>
+<p>The same nine weights are used at every position, which is why a CNN finds an edge wherever it appears.</p>
+<p class="mu">Padding puts a ring of zeros around the image so border pixels count as much as the middle ones and the output doesn’t shrink. Stride is how far the filter jumps each move.</p></div>
+<div><div class="row">
+<div class="col"><small>Input</small><div class="grid" id="ci"></div></div>
+<div class="col"><small>Filter</small><div class="grid k" id="ck"></div></div>
+<div class="col"><small>Feature map</small><div class="grid" id="co"></div></div></div>
+<div class="ctl"><button class="btn" id="cp">Play</button><button class="btn t" id="cs">Step once</button>
+<label>Padding <select id="pad"><option value="0">none</option><option value="1">1 pixel</option></select></label>
+<label>Stride <select id="str"><option>1</option><option>2</option></select></label></div>
+<div class="calc" id="cc">Press Play and watch the yellow window.</div><div class="read" id="cinfo"></div></div></section>
+
+<section id="pool"><div><h2>Pooling</h2>
+<p>Feature maps are big and a little redundant. Pooling shrinks them: look at a 2×2 window, keep one value, move on. Max pooling keeps the strongest response, average pooling keeps the mean.</p>
+<p class="mu">There is nothing to learn here, no weights at all. The payoff is a smaller layer and some tolerance for the object sitting a pixel or two off.</p></div>
+<div><div class="row">
+<div class="col"><small>Feature map, 4×4</small><div class="grid" id="pi"></div></div>
+<div class="col"><small>After pooling, 2×2</small><div class="grid" id="po"></div></div></div>
+<div class="ctl"><button class="btn" id="pp">Play</button><button class="btn t" id="ps">Step once</button>
+<label>Method <select id="pm"><option value="max">max</option><option value="avg">average</option></select></label></div>
+<div class="calc" id="pc">Window 2×2, stride 2. Sixteen values become four.</div></div></section>
+
+<section id="act"><div><h2>ReLU and sigmoid</h2>
+<p>If every layer only added and multiplied, the whole network would collapse into a single linear formula. Activation functions put a bend in the middle so the network can learn curves.</p>
+<p>The pink dashed line is the gradient, the number backpropagation multiplies by. Where it’s near zero, learning stalls.</p>
+<p class="mu" id="an"></p></div>
+<div><canvas id="ac" width="760" height="300" role="img" aria-label="Plot of the selected activation function and its gradient"></canvas>
+<input type="range" id="xv" min="-6" max="6" step="0.1" value="1.5" aria-label="Input x">
+<div class="read">x = <b id="rx"></b> &nbsp; f(x) = <b id="rf"></b> &nbsp; f′(x) = <b class="m" id="rd"></b></div>
+<div class="ctl"><button class="btn t on" id="b1">ReLU: max(0, x)</button><button class="btn t" id="b2">Sigmoid: 1 / (1 + e⁻ˣ)</button></div></div></section>
+
+<section id="neuron"><div><h2>One neuron, one update</h2>
+<p>A neuron takes inputs, multiplies each by a weight, adds a bias, and applies an activation: a = σ(w₁x₁ + w₂x₂ + b).</p>
+<p>Here x₁ is 0.8, x₂ is 0.3, and the right answer is 1. Drag the weights and watch the loss and the gradient respond.</p>
+<p class="mu">The gradient comes from the chain rule: ∂loss/∂w₁ = 2(a − 1) · a(1 − a) · x₁. If it’s negative, raising w₁ lowers the loss. Gradient descent then sets w₁ to w₁ − η · gradient.</p></div>
+<div><label>w₁ <b id="v1"></b><input type="range" id="w1" min="-3" max="3" step="0.1" value="-1"></label>
+<label>w₂ <b id="v2"></b><input type="range" id="w2" min="-3" max="3" step="0.1" value="0.5"></label>
+<label>bias <b id="v3"></b><input type="range" id="w3" min="-3" max="3" step="0.1" value="0"></label>
+<div class="read">z = <b id="nz"></b><br>sigmoid(z) = <b id="ns"></b><br>ReLU(z) = <b id="nr"></b><br>loss = (a − 1)² = <b class="m" id="nl"></b><br>∂loss/∂w₁ = <b class="m" id="ng"></b></div></div></section>
+
+<section id="net"><div><h2>Dense layers, forward and backward</h2>
+<p>After the last pooling step the feature maps are flattened into one long list. In a dense layer, also called fully connected, every neuron receives every value from the layer before.</p>
+<p><b>Forward propagation</b> runs left to right and ends in a prediction. The loss says how wrong it was.</p>
+<p><b>Backward propagation</b> runs right to left. Using the chain rule, each weight learns how much it contributed to the error, then moves a small step to reduce it.</p></div>
+<div><canvas id="nc" width="760" height="340" role="img" aria-label="Network diagram with signals moving forward and backward"></canvas>
+<div class="ctl"><button class="btn" id="fw">Forward pass</button><button class="btn" id="bw" style="background:var(--rd);color:#fff">Backward pass</button><button class="btn t" id="tr">Run both</button></div>
+<div class="read">rounds <b id="nrd">0</b> &nbsp; loss <b class="m" id="nls">1.000</b> <span style="color:var(--mu)">(illustrative)</span></div>
+<div class="calc" id="ncap">Send a signal through the layers.</div></div></section>
+
+<section id="flow"><div><h2>The whole pipeline</h2>
+<p>Put the pieces in order and you have a CNN. Open each stage to see what it hands to the next.</p></div>
+<ol class="ol" id="fl"></ol></section>
+<footer>Training numbers on this page are illustrative. Convolution, pooling, activation and gradient values are computed live.</footer>
+</main>
+<script>
+const $=s=>document.querySelector(s),V=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function grid(el,M,c){el.style.gridTemplateColumns=`repeat(${M[0].length},1fr)`;el.innerHTML=M.flat().map(v=>`<i class="${c||''}">${v}</i>`).join('')}
+
+function sharp(cv,w,h){const r=Math.min(devicePixelRatio||1,2),c=cv.getContext('2d');cv.width=w*r;cv.height=h*r;c.setTransform(r,0,0,r,0,0);return c}
+
+// convolution and pooling demos
+function demo(P){let t=0,tm=null,c,N,O;
+ function build(){c=P.cfg();N=c.M.length;O=Math.floor((N-c.k)/c.s)+1;grid(P.inp,c.M);
+  if(c.pad){const n=P.inp.children;for(let i=0;i<N*N;i++){const r=i/N|0,q=i%N;if(r<c.pad||q<c.pad||r>=N-c.pad||q>=N-c.pad)n[i].classList.add('p')}}
+  grid(P.out,Array.from({length:O},()=>Array(O).fill('·')),'o');t=0;if(P.info)P.info.innerHTML=c.msg(O)}
+ function step(){if(t>=O*O)build();const r=t/O|0,q=t%O,w=[];
+  [...P.inp.children].forEach(e=>e.classList.remove('h'));
+  for(let a=0;a<c.k;a++)for(let b=0;b<c.k;b++){w.push(c.M[r*c.s+a][q*c.s+b]);P.inp.children[(r*c.s+a)*N+q*c.s+b].classList.add('h')}
+  const[v,tx]=c.op(w),o=P.out.children[t];o.textContent=v;o.className='o f';P.calc.textContent=tx;t++}
+ function stop(){clearInterval(tm);tm=null;P.play.textContent='Play'}
+ P.play.onclick=()=>{if(tm)return stop();P.play.textContent='Pause';step();tm=setInterval(step,950)};
+ P.stepb.onclick=()=>{stop();step()};
+ P.ctl.forEach(e=>e.onchange=()=>{stop();build();P.calc.textContent='Setting changed. Press Play.'});build()}
+const base=[[1,2,0,1,3,2],[0,1,3,2,1,0],[2,3,1,0,2,1],[1,0,2,3,1,2],[3,1,0,1,2,0],[0,2,1,2,0,3]],K=[1,0,-1,1,0,-1,1,0,-1];
+grid($('#ck'),[[1,0,-1],[1,0,-1],[1,0,-1]]);
+demo({inp:$('#ci'),out:$('#co'),calc:$('#cc'),info:$('#cinfo'),play:$('#cp'),stepb:$('#cs'),ctl:[$('#pad'),$('#str')],
+ cfg(){const p=+$('#pad').value,s=+$('#str').value,n=6+2*p,M=Array.from({length:n},(_,r)=>Array.from({length:n},(_,q)=>r>=p&&q>=p&&r<n-p&&q<n-p?base[r-p][q-p]:0));
+  return{M,k:3,s,pad:p,op:w=>{const v=w.reduce((a,x,i)=>a+x*K[i],0);return[v,w.map((x,i)=>`${x}×${K[i]}`).join(' + ')+' = '+v]},
+  msg:O=>`output = ⌊(6 + 2×${p} − 3) / ${s}⌋ + 1 = <b>${O}×${O}</b>`}}});
+const pm=[[1,3,2,1],[4,6,5,0],[7,2,9,8],[1,0,3,4]];
+demo({inp:$('#pi'),out:$('#po'),calc:$('#pc'),play:$('#pp'),stepb:$('#ps'),ctl:[$('#pm')],
+ cfg(){const mx=$('#pm').value=='max';return{M:pm,k:2,s:2,pad:0,msg:()=>'',op:w=>{const v=mx?Math.max(...w):+(w.reduce((a,b)=>a+b)/4).toFixed(2);return[v,`${mx?'max':'average'}(${w.join(', ')}) = ${v}`]}}}});
+
+// activations
+const ac=$('#ac'),ax=sharp(ac,760,300);let am='relu';
+const F={relu:v=>Math.max(0,v),sig:v=>1/(1+Math.exp(-v))},D={relu:v=>v>0?1:0,sig:v=>F.sig(v)*(1-F.sig(v))};
+const AN={relu:'ReLU zeroes out negatives and passes positives straight through. It’s cheap, and its gradient is exactly 1 for positive inputs. A neuron stuck on negative inputs gets gradient 0 and stops learning, which people call a dead neuron.',sig:'Sigmoid squeezes any input into the range 0 to 1, so it’s a natural fit for a yes/no output. Its gradient never tops 0.25 and fades toward 0 at both ends. Stack many sigmoid layers and the gradient vanishes before it reaches the early ones.'};
+function dAct(){const W=760,H=300,yr=am=='relu'?[-1,6]:[-.2,1.2],sx=v=>(v+6)/12*W,sy=v=>H-(v-yr[0])/(yr[1]-yr[0])*H,xv=+$('#xv').value;
+ ax.clearRect(0,0,W,H);ax.strokeStyle=V('--ln');ax.lineWidth=1.5;ax.beginPath();ax.moveTo(sx(0),0);ax.lineTo(sx(0),H);ax.moveTo(0,sy(0));ax.lineTo(W,sy(0));ax.stroke();
+ const line=(fn,col,dash)=>{ax.setLineDash(dash);ax.strokeStyle=col;ax.lineWidth=3.5;ax.beginPath();for(let i=0;i<=240;i++){const v=-6+i/20;i?ax.lineTo(sx(v),sy(fn(v))):ax.moveTo(sx(v),sy(fn(v)))}ax.stroke()};
+ line(F[am],V('--bl'),[]);line(D[am],V('--rd'),[9,7]);ax.setLineDash([]);
+ ax.fillStyle=V('--ye');ax.strokeStyle=V('--ink');ax.lineWidth=2.5;ax.beginPath();ax.arc(sx(xv),sy(F[am](xv)),9,0,7);ax.fill();ax.stroke();
+ $('#rx').textContent=xv.toFixed(1);$('#rf').textContent=F[am](xv).toFixed(3);$('#rd').textContent=D[am](xv).toFixed(3);$('#an').textContent=AN[am]}
+$('#xv').oninput=dAct;
+[['b1','relu'],['b2','sig']].forEach(([id,m])=>$('#'+id).onclick=()=>{am=m;$('#b1').classList.toggle('on',m=='relu');$('#b2').classList.toggle('on',m=='sig');dAct()});dAct();
+
+// neuron
+function nu(){const w1=+$('#w1').value,w2=+$('#w2').value,b=+$('#w3').value,z=w1*.8+w2*.3+b,a=F.sig(z);
+ $('#v1').textContent=w1.toFixed(1);$('#v2').textContent=w2.toFixed(1);$('#v3').textContent=b.toFixed(1);
+ $('#nz').textContent=z.toFixed(3);$('#ns').textContent=a.toFixed(3);$('#nr').textContent=Math.max(0,z).toFixed(3);
+ $('#nl').textContent=((a-1)**2).toFixed(3);$('#ng').textContent=(2*(a-1)*a*(1-a)*.8).toFixed(3)}
+['w1','w2','w3'].forEach(i=>$('#'+i).oninput=nu);nu();
+
+// network
+const nc=$('#nc'),g=sharp(nc,760,340),L=[3,4,4,2],NM=['input','dense 1','dense 2','output'];let wv=-9,dir=1,loss=1,rounds=0,raf;
+const P=(l,i)=>[70+l*620/3,300/(L[l]+1)*(i+1)+8];
+function dNet(){g.clearRect(0,0,760,340);const col=dir>0?V('--bl'):V('--rd');
+ for(let l=0;l<3;l++)for(let i=0;i<L[l];i++)for(let j=0;j<L[l+1];j++){const a=P(l,i),b=P(l+1,j),e=Math.max(0,1-Math.abs(wv-(l+.5))*1.2);
+  g.globalAlpha=.18+e*.75;g.strokeStyle=e>.05?col:V('--ink');g.lineWidth=1+e;g.beginPath();g.moveTo(...a);g.lineTo(...b);g.stroke();
+  const s=wv-l;if(s>=0&&s<=1){g.globalAlpha=1;g.fillStyle=col;g.beginPath();g.arc(a[0]+(b[0]-a[0])*s,a[1]+(b[1]-a[1])*s,3.5,0,7);g.fill()}}
+ g.globalAlpha=1;
+ for(let l=0;l<4;l++){const e=Math.max(0,1-Math.abs(wv-l));for(let i=0;i<L[l];i++){const[x,y]=P(l,i);g.fillStyle=V('--bg');g.strokeStyle=V('--ink');g.lineWidth=2;g.beginPath();g.arc(x,y,15,0,7);g.fill();g.stroke();g.globalAlpha=e;g.fillStyle=col;g.beginPath();g.arc(x,y,15,0,7);g.fill();g.globalAlpha=1}
+  g.fillStyle=V('--mu');g.font='600 21px Bricolage Grotesque,Arial,sans-serif';g.textAlign='center';g.fillText(NM[l],P(l,0)[0],332)}}
+function run(d){return new Promise(res=>{cancelAnimationFrame(raf);dir=d;const t0=performance.now(),A=d>0?-.4:3.4,B=d>0?3.4:-.4;
+ $('#ncap').textContent=d>0?'Forward: every layer computes a = σ(W·x + b) and passes it on. The last layer’s output is compared with the label to get the loss.':'Backward: the error travels right to left. The chain rule gives each weight a gradient, then w ← w − η · ∂L/∂w.';
+ (function f(n){const p=Math.min(1,(n-t0)/2600);wv=A+(B-A)*p;dNet();if(p<1)raf=requestAnimationFrame(f);else{if(d<0){loss*=.78;rounds++;$('#nrd').textContent=rounds;$('#nls').textContent=loss.toFixed(3)}res()}})(t0)})}
+$('#fw').onclick=()=>run(1);$('#bw').onclick=()=>run(-1);$('#tr').onclick=async()=>{await run(1);await run(-1)};dNet();
+
+// pipeline
+const ST=[['Input image','The picture arrives as numbers: height × width × channels. A colour photo has three channels, red, green and blue.'],
+['Convolution','Filters slide across the image and produce feature maps. Early layers pick up edges and textures, deeper ones pick up parts and shapes.'],
+['ReLU','Every negative value becomes zero. That small bend is what lets the stack of layers model something more than a straight line.'],
+['Pooling','Each feature map shrinks, for example from 24×24 to 12×12, and the strongest responses survive.'],
+['Flatten and dense layers','The maps are unrolled into one vector. Each dense neuron sees all of it and combines the features into evidence for or against each class.'],
+['Output','Sigmoid gives one probability for a two-class problem. Softmax gives one probability per class, and they add up to 1.'],
+['Loss and backpropagation','The loss measures the error. Gradients flow back through every layer, gradient descent adjusts the weights, and the whole thing repeats many times.']];
+const fl=$('#fl');fl.innerHTML=ST.map((s,i)=>`<li><button aria-expanded="false"><span>${i+1}</span>${s[0]}</button><div class="d"><div><p>${s[1]}</p></div></div></li>`).join('');
+function openStage(i){[...fl.children].forEach((l,j)=>{l.classList.toggle('on',j==i);l.firstChild.setAttribute('aria-expanded',j==i)})}
+fl.onclick=e=>{const b=e.target.closest('button');if(b)openStage([...fl.children].indexOf(b.parentNode))};openStage(0);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{dAct();dNet()});
+</script></body></html>
